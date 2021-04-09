@@ -1,0 +1,101 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "ASAApiVersion": {
+      "value": "2017-04-01-preview"
+    },
+    "StreamAnalyticsJobName": {
+      "value": "DATAINT-CRM-REDUCER-V01-SA"
+    },
+    "Location": {
+      "value": "Central US"
+    },
+    "OutputStartMode": {
+      "value": "JobStartTime"
+    },
+    "OutputStartTime": {
+      "value": "2019-01-01T00:00:00Z"
+    },
+    "DataLocale": {
+      "value": "en-US"
+    },
+    "OutputErrorPolicy": {
+      "value": "Drop"
+    },
+    "EventsLateArrivalMaxDelayInSeconds": {
+      "value": 5
+    },
+    "EventsOutOfOrderMaxDelayInSeconds": {
+      "value": 0
+    },
+    "EventsOutOfOrderPolicy": {
+      "value": "Adjust"
+    },
+    "StreamingUnits": {
+      "value": 6
+    },
+    "CompatibilityLevel": {
+      "value": "1.2"
+    },
+    "ContentStoragePolicy": {
+      "value": "SystemAccount"
+    },
+    "Input_input_serviceBusNamespace": {
+      "value": "azw-sit-oculos-eh"
+    },
+    "Input_input_eventHubName": {
+      "value": "crm-events"
+    },
+    "Input_input_consumerGroupName": {
+      "value": "stream-analytics"
+    },
+    "Input_input_sharedAccessPolicyName": {
+      "value": "RootManageSharedAccessKey"
+    },
+    "Input_input_sharedAccessPolicyKey": {
+      "value": null
+    },
+    "Input_input_authenticationMode": {
+      "value": "ConnectionString"
+    },
+    "Output_output-root-topic_serviceBusNamespace": {
+      "value": "azw-sit-oculos-sbn"
+    },
+    "Output_output-root-topic_sharedAccessPolicyName": {
+      "value": "RootManageSharedAccessKey"
+    },
+    "Output_output-root-topic_sharedAccessPolicyKey": {
+      "value": null
+    },
+    "Output_output-root-topic_topicName": {
+      "value": "crm-forward"
+    },
+    "Output_output-root-topic_propertyColumns": {
+      "value": [
+        "EntityLogicalName",
+        "RequestName",
+        "Keys"
+      ]
+    },
+    "Output_output-root-aggregated-topic_serviceBusNamespace": {
+      "value": "AZW-SIT-OCULOS-SBN"
+    },
+    "Output_output-root-aggregated-topic_sharedAccessPolicyName": {
+      "value": "RootManageSharedAccessKey"
+    },
+    "Output_output-root-aggregated-topic_sharedAccessPolicyKey": {
+      "value": null
+    },
+    "Output_output-root-aggregated-topic_topicName": {
+      "value": "crm-forward-aggregated"
+    },
+    "Output_output-root-aggregated-topic_propertyColumns": {
+      "value": [
+        "EntityLogicalName",
+        "RequestName",
+        "Keys"
+      ]
+    }
+  }
+}

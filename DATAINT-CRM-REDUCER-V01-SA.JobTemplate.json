@@ -1,0 +1,377 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "ASAApiVersion": {
+      "type": "string"
+    },
+    "StreamAnalyticsJobName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 63,
+      "metadata": {
+        "description": "Stream Analytics Job Name, can contain alphanumeric characters and hypen and must be 3-63 characters long"
+      }
+    },
+    "Location": {
+      "type": "string"
+    },
+    "OutputStartMode": {
+      "type": "string",
+      "allowedValues": [
+        "JobStartTime",
+        "CustomTime",
+        "LastOutputEventTime"
+      ]
+    },
+    "OutputStartTime": {
+      "type": "string"
+    },
+    "DataLocale": {
+      "type": "string"
+    },
+    "OutputErrorPolicy": {
+      "type": "string",
+      "allowedValues": [
+        "Drop",
+        "Stop"
+      ]
+    },
+    "EventsLateArrivalMaxDelayInSeconds": {
+      "type": "int"
+    },
+    "EventsOutOfOrderMaxDelayInSeconds": {
+      "type": "int"
+    },
+    "EventsOutOfOrderPolicy": {
+      "type": "string",
+      "allowedValues": [
+        "Adjust",
+        "Drop"
+      ]
+    },
+    "StreamingUnits": {
+      "type": "int",
+      "minValue": 1,
+      "maxValue": 192,
+      "metadata": {
+        "description": "Number of Streaming Units"
+      },
+      "allowedValues": [
+        1,
+        3,
+        6,
+        12,
+        18,
+        24,
+        30,
+        36,
+        42,
+        48,
+        54,
+        60,
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192
+      ]
+    },
+    "CompatibilityLevel": {
+      "type": "string",
+      "allowedValues": [
+        "1.0",
+        "1.1",
+        "1.2"
+      ]
+    },
+    "ContentStoragePolicy": {
+      "type": "string",
+      "allowedValues": [
+        "SystemAccount",
+        "JobStorageAccount"
+      ]
+    },
+    "Input_input_serviceBusNamespace": {
+      "type": "string"
+    },
+    "Input_input_eventHubName": {
+      "type": "string"
+    },
+    "Input_input_consumerGroupName": {
+      "type": "string"
+    },
+    "Input_input_sharedAccessPolicyName": {
+      "type": "string"
+    },
+    "Input_input_sharedAccessPolicyKey": {
+      "type": "string"
+    },
+    "Input_input_authenticationMode": {
+      "type": "string"
+    },
+    "Output_output-root-topic_serviceBusNamespace": {
+      "type": "string"
+    },
+    "Output_output-root-topic_sharedAccessPolicyName": {
+      "type": "string"
+    },
+    "Output_output-root-topic_sharedAccessPolicyKey": {
+      "type": "string"
+    },
+    "Output_output-root-topic_topicName": {
+      "type": "string"
+    },
+    "Output_output-root-topic_propertyColumns": {
+      "type": "array"
+    },
+    "Output_output-root-aggregated-topic_serviceBusNamespace": {
+      "type": "string"
+    },
+    "Output_output-root-aggregated-topic_sharedAccessPolicyName": {
+      "type": "string"
+    },
+    "Output_output-root-aggregated-topic_sharedAccessPolicyKey": {
+      "type": "string"
+    },
+    "Output_output-root-aggregated-topic_topicName": {
+      "type": "string"
+    },
+    "Output_output-root-aggregated-topic_propertyColumns": {
+      "type": "array"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.StreamAnalytics/StreamingJobs",
+      "apiVersion": "[parameters('ASAApiVersion')]",
+      "name": "[parameters('StreamAnalyticsJobName')]",
+      "location": "[parameters('Location')]",
+      "properties": {
+        "outputStartMode": "[parameters('OutputStartMode')]",
+        "outputStartTime": "[if(equals(parameters('OutputStartMode'),'CustomTime'), parameters('OutputStartTime'), json('null'))]",
+        "sku": {
+          "name": "standard"
+        },
+        "jobType": "Cloud",
+        "eventsOutOfOrderPolicy": "[parameters('EventsOutOfOrderPolicy')]",
+        "outputErrorPolicy": "[parameters('OutputErrorPolicy')]",
+        "eventsOutOfOrderMaxDelayInSeconds": "[parameters('EventsOutOfOrderMaxDelayInSeconds')]",
+        "eventsLateArrivalMaxDelayInSeconds": "[parameters('EventsLateArrivalMaxDelayInSeconds')]",
+        "dataLocale": "[parameters('DataLocale')]",
+        "compatibilityLevel": "[parameters('CompatibilityLevel')]",
+        "contentStoragePolicy": "[parameters('ContentStoragePolicy')]",
+        "transformation": {
+          "name": "Transformation",
+          "properties": {
+            "streamingUnits": "[parameters('StreamingUnits')]",
+            "query": "WITH Reduced AS (\n    SELECT\n        CorrelationId,\n        MessageName,\n        PrimaryEntityName,\n        PrimaryEntityId,\n        OperationCreatedOn,\n        udf.removeFormattedValues(input) as Attributes,\n        MessageName as RequestName,\n        PrimaryEntityName as EntityLogicalName,\n        EventEnqueuedUtcTime\n    FROM\n        [input]\n), AggregateRootDefined AS (\n    SELECT\n        *,\n        udf.getAggregateRoot(Reduced) as AggregateRootId\n        --PrimaryEntityId as AggregateRootId\n    FROM\n        Reduced\n)\n\nSELECT \n    *\nINTO\n    [output-root-topic]\nFROM\n    AggregateRootDefined\n    \nSELECT\n    PrimaryEntityName,\n    udf.getRequestName(Collect(MessageName)) as MessageName,\n    AggregateRootId,\n    udf.aggregateAttributes(Collect(Attributes)) as Attributes,\n    udf.getKeys(Collect(Attributes)) as Keys,\n    udf.getRequestName(Collect(MessageName)) as RequestName,\n    PrimaryEntityName as EntityLogicalName,\n    COUNT(1) as 'Count'\nINTO\n    [output-root-aggregated-topic]\nFROM\n    AggregateRootDefined\nGROUP BY\n    PrimaryEntityName,\n    AggregateRootId,\n    SessionWindow(second, 5, 15)"
+          }
+        },
+        "inputs": [
+          {
+            "name": "input",
+            "properties": {
+              "type": "Stream",
+              "datasource": {
+                "type": "Microsoft.ServiceBus/EventHub",
+                "properties": {
+                  "serviceBusNamespace": "[parameters('Input_input_serviceBusNamespace')]",
+                  "eventHubName": "[parameters('Input_input_eventHubName')]",
+                  "consumerGroupName": "[parameters('Input_input_consumerGroupName')]",
+                  "sharedAccessPolicyName": "[parameters('Input_input_sharedAccessPolicyName')]",
+                  "sharedAccessPolicyKey": "[parameters('Input_input_sharedAccessPolicyKey')]",
+                  "authenticationMode": "[parameters('Input_input_authenticationMode')]"
+                }
+              },
+              "compression": {
+                "type": "None"
+              },
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8"
+                }
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "output-root-topic",
+            "properties": {
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8",
+                  "format": "Array"
+                }
+              },
+              "datasource": {
+                "type": "Microsoft.ServiceBus/Topic",
+                "properties": {
+                  "serviceBusNamespace": "[parameters('Output_output-root-topic_serviceBusNamespace')]",
+                  "topicName": "[parameters('Output_output-root-topic_topicName')]",
+                  "sharedAccessPolicyName": "[parameters('Output_output-root-topic_sharedAccessPolicyName')]",
+                  "sharedAccessPolicyKey": "[parameters('Output_output-root-topic_sharedAccessPolicyKey')]",
+                  "propertyColumns": "[parameters('Output_output-root-topic_propertyColumns')]"
+                }
+              }
+            }
+          },
+          {
+            "name": "output-root-aggregated-topic",
+            "properties": {
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8",
+                  "format": "Array"
+                }
+              },
+              "datasource": {
+                "type": "Microsoft.ServiceBus/Topic",
+                "properties": {
+                  "serviceBusNamespace": "[parameters('Output_output-root-aggregated-topic_serviceBusNamespace')]",
+                  "topicName": "[parameters('Output_output-root-aggregated-topic_topicName')]",
+                  "sharedAccessPolicyName": "[parameters('Output_output-root-aggregated-topic_sharedAccessPolicyName')]",
+                  "sharedAccessPolicyKey": "[parameters('Output_output-root-aggregated-topic_sharedAccessPolicyKey')]",
+                  "propertyColumns": "[parameters('Output_output-root-aggregated-topic_propertyColumns')]"
+                }
+              }
+            }
+          }
+        ],
+        "functions": [
+          {
+            "name": "aggregateAttributes",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "any"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "function main(input) {\n    let flatted = [];\n\n    input.forEach(x => {\n      flatted = [...flatted, ...x]\n    });\n\n    let keys = [...new Set(flatted.map(x => x.key))];\n\n    let aggregated = \n      keys.\n        map(key => {\n          return {\n            key: key,\n            value: flatted.find(x => x.key === key).value\n          }\n        })\n\n    return aggregated;\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "getAggregateRoot",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "any"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "function main(input) {\n    switch(input.PrimaryEntityName) {\n      case 'ah4r_propertyamenity': \n          let property = input.Attributes.filter(x => x.key === 'ah4r_property' || x.key == 'isi_propertyid')[0];\n          return property.value;\n      default:\n          return input.PrimaryEntityId\n  }\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "getKeys",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "any"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDF which returns sum of two values.\nfunction main(input) {\n    let flatted = [];\n\n    input.forEach(x => {\n      flatted = [...flatted, ...x]\n    });\n\n    let keys = [...new Set(flatted.map(x => x.key))];\n\n    if (keys.length === 0)\n        return '';\n\n    return keys.join(',');\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "removeFormattedValues",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "any"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "function main(input) {\n    let inputParameters = getParameters(input.InputParameters[0].value.Attributes);\n\n    if (input.ParentContext && input.ParentContext.InputParameters) {\n        let parentContextInputParameters = [];\n\n        if (input.ParentContext.InputParameters[0].value.Attributes)\n          parentContextInputParameters = getParameters(input.ParentContext.InputParameters[0].value.Attributes);\n\n        let keys = inputParameters.map(x => x.key);\n\n        parentContextInputParameters.forEach(x => {\n          if (!keys.includes(x.key))\n              inputParameters.push(x);\n        });\n    }\n\n    if (input.ParentContext && input.ParentContext.ParentContext) {\n      let parentContextInputParameters = [];\n\n      // This context contains different schema for some of the events\n      if (input.ParentContext.ParentContext.InputParameters[0].value.Attributes)\n        parentContextInputParameters = getParameters(input.ParentContext.ParentContext.InputParameters[0].value.Attributes);\n\n        let keys = inputParameters.map(x => x.key);\n\n        parentContextInputParameters.forEach(x => {\n          if (!keys.includes(x.key))\n              inputParameters.push(x);\n        });\n    }\n\n    return inputParameters;\n}\n\nfunction getParameters(attributes) {\n    let attributesToRemove = [\n      '__type',\n      'EntityState',\n      'FormattedValues',\n      'KeyAttributes',\n      'RelatedEntities',\n      'EntityState',\n      'modifiedby',\n      'createdby',\n      'createdonbehalfby',\n      'ownerid',\n      'owningbusinessunit', \n      'modifiedonbehalfby', \n      'attachmenterrors',\n      'ah4r_displayindex'  \n    ]\n\n    let filteredAttributes = attributes.filter(x => !attributesToRemove.includes(x.key)).map(x => {\n      if (!x.value === undefined || x.value === null)\n        return x;\n\n      return {\n        key: x.key,\n        value: x.value.Id ? x.value.Id : x.value.Value !== undefined ? x.value.Value : x.value \n      }\n    });\n\n    return filteredAttributes;\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "getRequestName",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "any"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "function main(input) {\n    return input.some(x => x === 'Create') ? 'Create' : 'Update';\n}"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
